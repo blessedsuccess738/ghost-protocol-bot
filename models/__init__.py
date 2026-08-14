@@ -1,5 +1,22 @@
+"""
+models/__init__.py — SQLAlchemy mapped classes for 『𝑮𝑷』 𝑮𝑯𝑶𝑺𝑻 𝑷𝑹𝑶𝑻𝑶𝑪𝑶𝑳 BOT.
+
+All models are defined here and re-exported from the models package.
+"""
 from datetime import datetime, timezone
-from sqlalchemy import (JSON, Column, DateTime, ForeignKey, Index, Integer, String, Text, func)
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -13,6 +30,7 @@ class Base(DeclarativeBase):
 
 class Admin(Base):
     __tablename__ = "admins"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     telegram_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
     username: Mapped[str | None] = mapped_column(String(128))
@@ -24,25 +42,38 @@ class Admin(Base):
     permissions: Mapped[list | None] = mapped_column(JSON)
     is_active: Mapped[int] = mapped_column(Integer, default=1)
     last_login: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
     login_attempts: Mapped[int] = mapped_column(Integer, default=0)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     preferences: Mapped[dict | None] = mapped_column(JSON)
     timezone: Mapped[str | None] = mapped_column(String(64))
     notification_settings: Mapped[dict | None] = mapped_column(JSON)
+
     cases = relationship("Case", back_populates="admin")
     audit_logs = relationship("AuditLog", back_populates="admin")
     sessions = relationship("Session", back_populates="admin")
     notifications = relationship("Notification", back_populates="admin")
 
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<Admin id={self.id} tg={self.telegram_id} role={self.role}>"
+
 
 class Case(Base):
     __tablename__ = "cases"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     case_id: Mapped[str] = mapped_column(String(32), unique=True, nullable=False)
-    admin_id: Mapped[int | None] = mapped_column(ForeignKey("admins.id", ondelete="SET NULL"))
-    submitter_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    admin_id: Mapped[int | None] = mapped_column(
+        ForeignKey("admins.id", ondelete="SET NULL")
+    )
+    submitter_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
     target_link: Mapped[str] = mapped_column(String(512), nullable=False)
     target_type: Mapped[str | None] = mapped_column(String(32))
     target_name: Mapped[str | None] = mapped_column(String(255))
@@ -52,18 +83,31 @@ class Case(Base):
     status: Mapped[str] = mapped_column(String(32), default="PENDING")
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
     metadata_json: Mapped[dict | None] = mapped_column("metadata", JSON)
+
     admin = relationship("Admin", back_populates="cases")
     submitter = relationship("User", back_populates="cases")
-    evidence = relationship("Evidence", back_populates="case", cascade="all, delete-orphan")
+    evidence = relationship(
+        "Evidence", back_populates="case", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<Case {self.case_id} status={self.status}>"
 
 
 class Evidence(Base):
     __tablename__ = "evidence"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    case_id: Mapped[int] = mapped_column(ForeignKey("cases.id", ondelete="CASCADE"), nullable=False)
+    case_id: Mapped[int] = mapped_column(
+        ForeignKey("cases.id", ondelete="CASCADE"), nullable=False
+    )
     evidence_type: Mapped[str] = mapped_column(String(32), nullable=False)
     reference: Mapped[str] = mapped_column(String(1024), nullable=False)
     file_id: Mapped[str | None] = mapped_column(String(255))
@@ -71,152 +115,287 @@ class Evidence(Base):
     file_size: Mapped[int | None] = mapped_column(Integer)
     file_type: Mapped[str | None] = mapped_column(String(64))
     description: Mapped[str | None] = mapped_column(Text)
-    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, server_default=func.now())
+    uploaded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, server_default=func.now()
+    )
+
     case = relationship("Case", back_populates="evidence")
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<Evidence id={self.id} type={self.evidence_type}>"
 
 
 class AuditLog(Base):
     __tablename__ = "audit_logs"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    admin_id: Mapped[int | None] = mapped_column(ForeignKey("admins.id", ondelete="SET NULL"))
+    admin_id: Mapped[int | None] = mapped_column(
+        ForeignKey("admins.id", ondelete="SET NULL")
+    )
     action: Mapped[str] = mapped_column(String(64), nullable=False)
     details: Mapped[dict | None] = mapped_column(JSON)
     ip_address: Mapped[str | None] = mapped_column(String(64))
     user_agent: Mapped[str | None] = mapped_column(String(512))
     session_id: Mapped[str | None] = mapped_column(String(128))
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, server_default=func.now())
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, server_default=func.now()
+    )
     severity: Mapped[str] = mapped_column(String(16), default="info")
+
     admin = relationship("Admin", back_populates="audit_logs")
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<AuditLog {self.action} @ {self.timestamp}>"
 
 
 class Session(Base):
     __tablename__ = "sessions"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     session_id: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
-    admin_id: Mapped[int] = mapped_column(ForeignKey("admins.id", ondelete="CASCADE"), nullable=False)
+    admin_id: Mapped[int] = mapped_column(
+        ForeignKey("admins.id", ondelete="CASCADE"), nullable=False
+    )
     token: Mapped[str] = mapped_column(String(512), nullable=False)
     ip_address: Mapped[str | None] = mapped_column(String(64))
     user_agent: Mapped[str | None] = mapped_column(String(512))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, server_default=func.now()
+    )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     is_active: Mapped[int] = mapped_column(Integer, default=1)
+
     admin = relationship("Admin", back_populates="sessions")
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<Session {self.session_id} active={self.is_active}>"
 
 
 class Notification(Base):
     __tablename__ = "notifications"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    admin_id: Mapped[int | None] = mapped_column(ForeignKey("admins.id", ondelete="CASCADE"))
+    admin_id: Mapped[int | None] = mapped_column(
+        ForeignKey("admins.id", ondelete="CASCADE")
+    )
     type: Mapped[str] = mapped_column(String(32), default="info")
     title: Mapped[str] = mapped_column(String(255))
     message: Mapped[str] = mapped_column(Text)
     is_read: Mapped[int] = mapped_column(Integer, default=0)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, server_default=func.now()
+    )
+
     admin = relationship("Admin", back_populates="notifications")
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<Notification id={self.id} type={self.type}>"
 
 
 class Analytics(Base):
     __tablename__ = "analytics"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     metric: Mapped[str] = mapped_column(String(64), nullable=False)
     value: Mapped[float] = mapped_column(Integer, default=0)
     category: Mapped[str | None] = mapped_column(String(64))
-    admin_id: Mapped[int | None] = mapped_column(ForeignKey("admins.id", ondelete="SET NULL"))
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, server_default=func.now())
+    admin_id: Mapped[int | None] = mapped_column(
+        ForeignKey("admins.id", ondelete="SET NULL")
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, server_default=func.now()
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<Analytics {self.metric}={self.value}>"
 
 
 class Setting(Base):
     __tablename__ = "settings"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     key: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
     value: Mapped[str | None] = mapped_column(Text)
     category: Mapped[str | None] = mapped_column(String(64))
     is_system: Mapped[int] = mapped_column(Integer, default=0)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
     updated_by: Mapped[int | None] = mapped_column(Integer)
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<Setting {self.key}={self.value}>"
 
 
 class RateLimit(Base):
     __tablename__ = "rate_limits"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int | None] = mapped_column(Integer)
     action: Mapped[str] = mapped_column(String(64), nullable=False)
-    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, server_default=func.now())
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, server_default=func.now()
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<RateLimit user={self.user_id} action={self.action}>"
 
 
 class User(Base):
+    """Every bot user gets an automatic profile."""
+
     __tablename__ = "users"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     telegram_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
     username: Mapped[str | None] = mapped_column(String(128))
     first_name: Mapped[str | None] = mapped_column(String(255))
     coins: Mapped[int] = mapped_column(Integer, default=0)
     referral_count: Mapped[int] = mapped_column(Integer, default=0)
-    referred_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    referred_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
     referral_code: Mapped[str | None] = mapped_column(String(32), unique=True)
     moderation_status: Mapped[str] = mapped_column(String(32), default="NORMAL")
     is_banned: Mapped[int] = mapped_column(Integer, default=0)
     ban_reason: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[int] = mapped_column(Integer, default=1)
     last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
+
     cases = relationship("Case", back_populates="submitter")
-    coin_transactions = relationship("CoinTransaction", back_populates="user", cascade="all, delete-orphan")
+    coin_transactions = relationship(
+        "CoinTransaction", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<User tg={self.telegram_id} coins={self.coins}>"
 
 
 class CoinTransaction(Base):
+    """Ledger for every coin change (add, add_all, referral, adjust)."""
+
     __tablename__ = "coin_transactions"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    amount: Mapped[int] = mapped_column(Integer, nullable=False)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    amount: Mapped[int] = mapped_column(Integer, nullable=False)  # positive = credit
     balance_after: Mapped[int] = mapped_column(Integer, default=0)
     tx_type: Mapped[str] = mapped_column(String(32), default="add")
     admin_id: Mapped[int | None] = mapped_column(Integer)
     note: Mapped[str | None] = mapped_column(String(512))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, server_default=func.now()
+    )
+
     user = relationship("User", back_populates="coin_transactions")
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<CoinTx user={self.user_id} amount={self.amount} type={self.tx_type}>"
 
 
 class Referral(Base):
+    """Referral relationship + reward state (duplicate-reward prevention)."""
+
     __tablename__ = "referrals"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    referrer_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    referred_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    referrer_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    referred_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
     reward_claimed: Mapped[int] = mapped_column(Integer, default=0)
     reward_amount: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, server_default=func.now()
+    )
+
     referrer = relationship("User", foreign_keys=[referrer_id])
     referred = relationship("User", foreign_keys=[referred_id])
 
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<Referral {self.referrer_id} -> {self.referred_id} claimed={self.reward_claimed}>"
+
 
 class BanRecord(Base):
+    """Moderation decision record (BAN / REJECT / PENDING / REVIEWED)."""
+
     __tablename__ = "ban_records"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     case_id: Mapped[str | None] = mapped_column(String(32))
     target: Mapped[str] = mapped_column(String(512), nullable=False)
     target_type: Mapped[str | None] = mapped_column(String(32))
     reason: Mapped[str] = mapped_column(String(64), nullable=False)
-    action: Mapped[str] = mapped_column(String(32), default="PENDING")
+    action: Mapped[str] = mapped_column(String(32), default="PENDING")  # BAN/REJECT/PENDING/REVIEWED
     admin_id: Mapped[int | None] = mapped_column(Integer)
     admin_telegram_id: Mapped[int | None] = mapped_column(Integer)
     evidence_ref: Mapped[str | None] = mapped_column(String(1024))
     note: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, server_default=func.now()
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<BanRecord target={self.target} action={self.action}>"
+
+
+class AttackLog(Base):
+    """Audit trail for the target-verification tools (attack_logs table).
+
+    Every verification/action performed via the 'Verify Target' tool suite
+    is recorded here with the acting admin, target, tool, status and result.
+    """
+
+    __tablename__ = "attack_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    admin_id: Mapped[int | None] = mapped_column(Integer)
+    admin_telegram_id: Mapped[int | None] = mapped_column(Integer)
+    target: Mapped[str] = mapped_column(String(512), nullable=False)
+    target_id: Mapped[str | None] = mapped_column(String(128))
+    target_type: Mapped[str | None] = mapped_column(String(32))
+    tool_used: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="SUCCESS")
+    result: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, server_default=func.now()
+    )
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<AttackLog tool={self.tool_used} target={self.target} status={self.status}>"
 
 
 class ForceGroupSetting(Base):
+    """Force-join group/channel configuration."""
+
     __tablename__ = "force_group_settings"
+
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     chat_id: Mapped[int | None] = mapped_column(Integer)
     chat_username: Mapped[str | None] = mapped_column(String(128))
     chat_title: Mapped[str | None] = mapped_column(String(255))
     enabled: Mapped[int] = mapped_column(Integer, default=0)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow
+    )
     updated_by: Mapped[int | None] = mapped_column(Integer)
 
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"<ForceGroup chat={self.chat_username or self.chat_id} enabled={self.enabled}>"
 
+
+# ─── Indexes (mirrors schema spec) ─────────────────────────────────────────
 Index("idx_cases_admin_id", Case.admin_id)
 Index("idx_cases_status", Case.status)
 Index("idx_cases_created_at", Case.created_at)
@@ -235,3 +414,7 @@ Index("idx_referrals_referrer_id", Referral.referrer_id)
 Index("idx_referrals_referred_id", Referral.referred_id)
 Index("idx_ban_records_target", BanRecord.target)
 Index("idx_ban_records_action", BanRecord.action)
+Index("idx_attack_logs_admin_id", AttackLog.admin_id)
+Index("idx_attack_logs_target", AttackLog.target)
+Index("idx_attack_logs_created_at", AttackLog.created_at)
+Index("idx_attack_logs_tool_used", AttackLog.tool_used)
